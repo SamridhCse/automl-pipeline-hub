@@ -1,0 +1,30 @@
+name: AutoML Hub CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Generate Champion Model for Test Suite
+        run: |
+          uv run python -c "from sklearn.datasets import load_iris; from app.engine import run_automl_job; df = load_iris(as_frame=True).frame; run_automl_job(df, target_col='target', experiment_name='Test_Iris', n_trials=2)"
+
+      - name: Run FastAPI Unit Tests
+        run: uv run pytest -v
+
+      - name: Verify Docker Build
+        run: docker compose build
