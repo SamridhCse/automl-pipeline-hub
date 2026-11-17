@@ -1,4 +1,6 @@
-﻿from fastapi.testclient import TestClient
+﻿import numpy as np
+from unittest.mock import patch, MagicMock
+from fastapi.testclient import TestClient
 from app.main import app
 
 client = TestClient(app)
@@ -18,7 +20,15 @@ def test_train_missing_target_column():
     assert response.status_code == 400
     assert "not found" in response.json()["detail"]
 
-def test_live_prediction_on_iris_champion():
+# --- FIXED: Mocked MLflow model for CI/CD ---
+@patch("app.main._load_model")
+def test_live_prediction_on_iris_champion(mock_load_model):
+    # 1. Ek fake model banao jo fake prediction return kare
+    mock_pipeline = MagicMock()
+    mock_pipeline.metadata.signature = None # Signature check skip karne ke liye
+    mock_pipeline.predict.return_value = np.array(["Setosa"]) # Fake prediction
+    mock_load_model.return_value = mock_pipeline
+
     payload = {
         "data": [
             {
@@ -30,7 +40,9 @@ def test_live_prediction_on_iris_champion():
         ]
     }
     response = client.post("/automl/predict/Test_Iris_champion", json=payload)
+    
     assert response.status_code == 200
     result = response.json()
     assert result["model_name"] == "Test_Iris_champion"
     assert len(result["predictions"]) == 1
+    assert result["predictions"][0] == "Setosa" # Check karo ki fake prediction hi aaya
